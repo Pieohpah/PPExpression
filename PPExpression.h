@@ -114,7 +114,7 @@ static NSInteger WATCHDOGLIMIT = 1000;
 
 @interface PPExpression : NSObject {
 @private
-    NSString* _mExpression;
+    NSMutableString* _mExpression;
     NSMutableString* _mToken;
     NSInteger _mType;
     NSInteger _mLevel;

@@ -10,11 +10,14 @@
 
 
 - (id) init {
-    [self setDouble:0.0];
-    [self setBool:NO];
-    _mString    = [[NSMutableString alloc] init];
-    _mType      =EXPR_NONE;
-    _mErrorCode =0;
+    self = [super init];
+    if(self) {
+        [self setDouble:0.0];
+        [self setBool:NO];
+        _mString    = [[NSMutableString alloc] init];
+        _mType      =EXPR_NONE;
+        _mErrorCode =0;
+    }
     return self;
 }
 
@@ -336,13 +339,15 @@ void LXFormsExpr::ParseOperand()
     return ((c >= '0' && c <= '9'));
 }
 
-- (unichar) popFirstCharacter:(NSString*) s {
-    if([s length]==0) {
-        s = @"";
+- (unichar) popFirstCharacter:(NSMutableString**) s {
+    if([*s length]==0) {
+        *s = [NSMutableString stringWithString:@""];
         return '\0';
     }
-    unichar c = [s characterAtIndex:0];
-    s = [s substringWithRange:NSMakeRange(1, [s length]-1)];
+    unichar c = [*s characterAtIndex:0];
+    NSMutableString* tmp = [NSMutableString stringWithString:[*s substringWithRange:NSMakeRange(1, [*s length]-1)]];
+    *s = nil;
+    *s = tmp;
     return c;
 }
 
@@ -365,11 +370,12 @@ void LXFormsExpr::ParseOperand()
 	// om första tecken efter space är delimiter 
 	//(c == '+' || c == '-' || c == '*' || c == '/' || c == '%'  || c == '^' || c == '(' || c == ')' || c == ',' || c == '=' || c=='<' || c=='>' || c=='!' || c=='&' || c=='|')	
 	//	!(((*expression) == '/') && (*(expression+1) == '*') && (*(expression+2) == '/'))
+    
+    // Nolla _mToken
+    [_mToken setString:@""];
 
 	const char* kw = (const char*)0;
-	if(
-		(
-         [self isDelim:[_mExpression characterAtIndex:0]] && 
+	if((    [self isDelim:[_mExpression characterAtIndex:0]] && 
 			(
              !(([_mExpression characterAtIndex:0]) == '/' && [self isAlpha:[_mExpression characterAtIndex:1]] && ![self isNumeric:[_mExpression characterAtIndex:1]]) &&
 				!((([_mExpression characterAtIndex:0]) == '/') && ([_mExpression characterAtIndex:1] == '*') && ([_mExpression characterAtIndex:2] == '/'))
@@ -378,23 +384,26 @@ void LXFormsExpr::ParseOperand()
 		_mType = PPCT_DEL;
 		if(kw != (const char*)0){
             // lägger till kw till token men hoppar över all alpha i expression
-			while([self isAlpha:[_mExpression characterAtIndex:0]]) [self popFirstCharacter:_mExpression];
-			//strcpy(t,kw);
-			//t = &t[strlen(t)];
-            //TODO: Gör om så token blir satt
+			while([self isAlpha:[_mExpression characterAtIndex:0]]) { 
+                [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
+            }
 		}
 		else { // lägger till till token
-			/*if([self isDelOper:[_mExpression characterAtIndex:0]] && *([_mExpression characterAtIndex:1])=='=')*t++ = *expression++;
-			if(iscomp([_mExpression characterAtIndex:0]) && iscomp([_mExpression characterAtIndex:1])) && ([_mExpression characterAtIndex:0])==([_mExpression characterAtIndex:1]))*t++ = *expression++;
-			*t++ = *expression++;*/
-            //TODO: Gör om på rätt sätt
+			if([self isDelOper:[_mExpression characterAtIndex:0]] && ([_mExpression characterAtIndex:1]=='='))
+                [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
+            
+			if([self isComp:[_mExpression characterAtIndex:0]] && [self isComp:[_mExpression characterAtIndex:1]] && ([_mExpression characterAtIndex:0]==[_mExpression characterAtIndex:1]))
+               [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
+            
+			[_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
 		}
 	}
 	// om det börjar på en siffra
 	else if([self isNumeric:[_mExpression characterAtIndex:0]]){
         // Lägger till typ och alla siffror 
 		_mType = PPCT_NUM;
-		while([self isNumeric:[_mExpression characterAtIndex:0]]);//*t++ = *expression++;
+		while([self isNumeric:[_mExpression characterAtIndex:0]])
+            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
 	}
 	// om det är en sträng
 	else if([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"'){
@@ -897,11 +906,8 @@ void LXFormsExpr::ParseOperand()
 			else if(_mType == PPCT_NUM ){
 				if(_mSkip[_mLevel] == YES){}
 				else {
-					int i;
-					for(i=0;[_mToken characterAtIndex:i];++i){
-						if([_mToken characterAtIndex:i] == ',')
-                            [_mToken replaceCharactersInRange:NSMakeRange(i,1) withString:@"."];
-					}
+					//int i;
+                    [_mToken replaceOccurrencesOfString:@"," withString:@"." options:NSCaseInsensitiveSearch range:NSMakeRange(0,[_mToken length])];
 					[r setDouble:[_mToken doubleValue]];
 				}
                 [self Parse];
@@ -1124,7 +1130,8 @@ void LXFormsExpr::ParseOperand()
 		
 		_mLevel = 0;
 
-        _mExpression = e;
+        _mExpression = [NSMutableString stringWithString:e];
+        _mToken = [NSMutableString stringWithString:@""];
 
 		[self Parse];
 
