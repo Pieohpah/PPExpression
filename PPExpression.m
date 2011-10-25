@@ -340,11 +340,16 @@ void LXFormsExpr::ParseOperand()
 }
 
 - (unichar) popFirstCharacter:(NSMutableString**) s {
+    
     if([*s length]==0) {
         *s = [NSMutableString stringWithString:@""];
         return '\0';
     }
     unichar c = [*s characterAtIndex:0];
+    if ([*s length]==1) {
+        [*s setString:@""];
+        return c;
+    }
     NSMutableString* tmp = [NSMutableString stringWithString:[*s substringWithRange:NSMakeRange(1, [*s length]-1)]];
     *s = nil;
     *s = tmp;
@@ -375,7 +380,7 @@ void LXFormsExpr::ParseOperand()
     [_mToken setString:@""];
 
 	const char* kw = (const char*)0;
-	if((    [self isDelim:[_mExpression characterAtIndex:0]] && 
+	if([_mExpression length] >=3 &&  (    [self isDelim:[_mExpression characterAtIndex:0]] && 
 			(
              !(([_mExpression characterAtIndex:0]) == '/' && [self isAlpha:[_mExpression characterAtIndex:1]] && ![self isNumeric:[_mExpression characterAtIndex:1]]) &&
 				!((([_mExpression characterAtIndex:0]) == '/') && ([_mExpression characterAtIndex:1] == '*') && ([_mExpression characterAtIndex:2] == '/'))
@@ -384,7 +389,7 @@ void LXFormsExpr::ParseOperand()
 		_mType = PPCT_DEL;
 		if(kw != (const char*)0){
             // lŠgger till kw till token men hoppar šver all alpha i expression
-			while([self isAlpha:[_mExpression characterAtIndex:0]]) { 
+			while([_mExpression length] && [self isAlpha:[_mExpression characterAtIndex:0]]) { 
                 [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
             }
 		}
@@ -399,14 +404,14 @@ void LXFormsExpr::ParseOperand()
 		}
 	}
 	// om det bšrjar pŒ en siffra
-	else if([self isNumeric:[_mExpression characterAtIndex:0]]){
+	else if([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]]){
         // LŠgger till typ och alla siffror 
 		_mType = PPCT_NUM;
-		while([self isNumeric:[_mExpression characterAtIndex:0]])
-            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
+		while([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]])
+            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; //TODO: Exception:Out of bounds troligen hŠr NSRangeException
 	}
 	// om det Šr en strŠng
-	else if([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"'){
+	else if([_mExpression length] &&  ([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"')){
 		// lŠgger till typ och strŠngfnutt och allt till nŠsta fnutt i token
         _mType = PPCT_STR;
 		/*char del=*expression++;
@@ -488,11 +493,11 @@ void LXFormsExpr::ParseOperand()
 **                                                                       **
 *************************************************************************/
 
-- (void) Level1: (PPExpressionResult*) r {
-	PPExpressionResult* t = [[PPExpressionResult alloc] init];
-	@try {
+- (void) Level1: (PPExpressionResult**) r {
+	PPExpressionResult* t1 = [[PPExpressionResult alloc] init];
+	//@try {
 		[self Level2:r];
-		while(([_mToken characterAtIndex:0] == '&') || ([_mToken characterAtIndex:0]  == '|')){
+		while([_mToken length] && (([_mToken characterAtIndex:0] == '&') || ([_mToken characterAtIndex:0]  == '|'))){
             
             if(_mWatchDog++ > WATCHDOGLIMIT) {
                 NSException *e = [NSException
@@ -503,24 +508,25 @@ void LXFormsExpr::ParseOperand()
             }
 
 			unichar o = [_mToken characterAtIndex:0];
-			if((o == '|' && [r boolValue]) || (o == '&' && ([r boolValue] == NO))){
+			if((o == '|' && [*r boolValue]) || (o == '&' && ([*r boolValue] == NO))){
 				self->_mSkip[_mLevel] = true;
 			}
 
 			[self Parse];
             
 			if(_mType == PPCT_UNDEF)break;
-			[self Level2:t];
+			[self Level2:&t1];
 			if(self->_mSkip[_mLevel] == NO){
 				if(o=='&')
-                    [r setBool:([r boolValue] && [t boolValue])];
+                    [*r setBool:([*r boolValue] && [t1 boolValue])];
 				else 
                     if(o=='|')
-                        [r setBool:([r boolValue] || [t boolValue])];
+                        [*r setBool:([*r boolValue] || [t1 boolValue])];
 			}	
 		}
-        [t release];
-	} @catch(NSException* e){
+        [t1 release];
+    
+	/*} @catch(NSException* e){
 		[t release];
 		@throw;
 	} @finally {
@@ -530,7 +536,7 @@ void LXFormsExpr::ParseOperand()
                           reason:@""
                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
 		@throw(e);
-	}
+	}*/
 }
 
 /*************************************************************************
@@ -541,12 +547,12 @@ void LXFormsExpr::ParseOperand()
 **                                                                       **
 *************************************************************************/
 
-- (void) Level2: (PPExpressionResult*) r {
-	PPExpressionResult* t = [[PPExpressionResult alloc] init];
+- (void) Level2: (PPExpressionResult**) r {
+	PPExpressionResult* t2 = [[PPExpressionResult alloc] init];
 	
-	@try {
+	//@try {
         [self Level3: r];
-        unichar t_1 = [_mToken characterAtIndex:0];
+    unichar t_1 = [_mToken length] == 0 ? '\0' : [_mToken characterAtIndex:0];
 
 	while(t_1=='<' || t_1=='>' || t_1=='=' || t_1=='!' ){ // Kolla om det är !=, ==, <= eller >=
         if(_mWatchDog++ > WATCHDOGLIMIT) {
@@ -557,30 +563,30 @@ void LXFormsExpr::ParseOperand()
             @throw(e);
         }
 		//char oper = token[0];
-		if(([_mToken characterAtIndex:1] != '\0') && ([_mToken characterAtIndex:1] == '=')){
+		if([_mToken length] >=2 &&  (([_mToken characterAtIndex:1] != '\0') && ([_mToken characterAtIndex:1] == '='))){
 			// andra tecken är ett '='
 
 			[self Parse];
             
-			[self Level3:t];
+			[self Level3:&t2];
             
 			if(_mSkip[_mLevel] == false){
-				if(([r isType] == EXPR_STRING) && ([t isType] == EXPR_STRING)){
-                    NSComparisonResult sComp = [[r stringValue] compare:[t stringValue]]; 
+				if(([*r isType] == EXPR_STRING) && ([t2 isType] == EXPR_STRING)){
+                    NSComparisonResult sComp = [[*r stringValue] compare:[t2 stringValue]]; 
 					//int sComp= strcmp(r->getString(),(*t).getString());
 					switch(t_1)
 					{
 					case '<':
-						[r setBool:(sComp == NSOrderedAscending || sComp == NSOrderedSame) ? YES:NO];
+						[*r setBool:(sComp == NSOrderedAscending || sComp == NSOrderedSame) ? YES:NO];
 						break;
 					case '>':
-						[r setBool:(sComp == NSOrderedDescending || sComp == NSOrderedSame) ? YES:NO];
+						[*r setBool:(sComp == NSOrderedDescending || sComp == NSOrderedSame) ? YES:NO];
 						break;
 					case '=':
-						[r setBool:(sComp == NSOrderedSame) ? YES:NO];
+						[*r setBool:(sComp == NSOrderedSame) ? YES:NO];
 						break;
 					case '!':
-						[r setBool:(sComp != NSOrderedSame) ? YES:NO];
+						[*r setBool:(sComp != NSOrderedSame) ? YES:NO];
 						break;
 					}
 				}
@@ -588,19 +594,19 @@ void LXFormsExpr::ParseOperand()
 					switch(t_1){
 					case '<':
 						//r->setBoolean(r->getDouble() <= (*t).getDouble());
-                        [r setBool:( [r doubleValue] <= [t doubleValue] )];    
+                        [*r setBool:( [*r doubleValue] <= [t2 doubleValue] )];    
 						break;
 					case '>':
-                        [r setBool:( [r doubleValue] >= [t doubleValue] )];
+                        [*r setBool:( [*r doubleValue] >= [t2 doubleValue] )];
 						break;
 					case '=':
-                        [r setBool:( [r doubleValue] == [t doubleValue] )];
+                        [*r setBool:( [*r doubleValue] == [t2 doubleValue] )];
 						break;
 					case '!':
-                        [r setBool:( [r doubleValue] != [t doubleValue] )];
+                        [*r setBool:( [*r doubleValue] != [t2 doubleValue] )];
 						break;
 					default:
-						[r setBool:NO];
+						[*r setBool:NO];
 					}
 				}
 			}
@@ -611,24 +617,24 @@ void LXFormsExpr::ParseOperand()
 
 				[self Parse];
 
-				[self Level3:t];
+				[self Level3:&t2];
 
-                NSComparisonResult sComp = [[r stringValue] compare:[t stringValue]];
+                NSComparisonResult sComp = [[*r stringValue] compare:[t2 stringValue]];
 				if(_mSkip[_mLevel] == false){
-					switch([r isType]){
+					switch([*r isType]){
 					case EXPR_DOUBLE:
 					case EXPR_BOOL:
 						if(t_1=='<')
-                            [r setBool:([r doubleValue] < [t doubleValue])];
+                            [*r setBool:([*r doubleValue] < [t2 doubleValue])];
 						if(t_1=='>')
-                            [r setBool:([r doubleValue] > [t doubleValue])];
+                            [*r setBool:([*r doubleValue] > [t2 doubleValue])];
 						break;
 					case EXPR_STRING:
 					default:
 						if(t_1=='<')
-                            [r setBool:((sComp = NSOrderedAscending) ? YES:NO)];
+                            [*r setBool:((sComp = NSOrderedAscending) ? YES:NO)];
 						if(t_1=='>')
-                            [r setBool:((sComp = NSOrderedDescending) ? YES:NO)];
+                            [*r setBool:((sComp = NSOrderedDescending) ? YES:NO)];
 					}
 				}
 			}
@@ -641,9 +647,8 @@ void LXFormsExpr::ParseOperand()
 			}
 		}
 	}
-	[t release];
-	} @catch(NSException* e){
-		[t release];
+	[t2 release];
+	/*} @catch(NSException* e){
 		@throw;
 	} @finally {
 		[t release];
@@ -652,7 +657,7 @@ void LXFormsExpr::ParseOperand()
                           reason:@""
                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
 		@throw(e);
-	}
+	}*/
 }
 
 /*************************************************************************
@@ -663,58 +668,57 @@ void LXFormsExpr::ParseOperand()
 **                                                                       **
 *************************************************************************/
 
-- (void) Level3: (PPExpressionResult*) r  {
-	PPExpressionResult* t = [[PPExpressionResult alloc] init];
+- (void) Level3: (PPExpressionResult**) r  {
+	PPExpressionResult* t3 = [[PPExpressionResult alloc] init];
 	unichar o;
 
-	@try {
+	//@try {
 		[self Level4:r];
-		while(((o = [_mToken characterAtIndex:0]) == '+') || (o == '-')){
+		while([_mToken length] && (((o = [_mToken characterAtIndex:0]) == '+') || (o == '-'))){
 
 			[self Parse];
 
-			[self Level4:t];
+			[self Level4:&t3];
             
 			if(_mSkip[_mLevel] == false){
 				if(o == '+'){
-					switch([r isType]){
+					switch([*r isType]){
 					case EXPR_DOUBLE:
-						[r setDouble:([r doubleValue]+[t doubleValue])];
+						[*r setDouble:([*r doubleValue]+[t3 doubleValue])];
 						break;
 					case EXPR_BOOL:
-                        [r setBool:([r boolValue] && [t boolValue])];
+                        [*r setBool:([*r boolValue] && [t3 boolValue])];
 						break;
 					case EXPR_STRING:
 					default:
-						if([r doubleValue]==0.0 && [t doubleValue]==0.0)
-                            [r appendString:[t stringValue]];
+						if([*r doubleValue]==0.0 && [t3 doubleValue]==0.0)
+                            [*r appendString:[t3 stringValue]];
 						else
-							[r setDouble:([r doubleValue]+[t doubleValue])];
+							[*r setDouble:([*r doubleValue]+[t3 doubleValue])];
 						break;
 		 			}
 				}
 				else if(o == '-'){
-					switch([r isType]){
+					switch([*r isType]){
 					case EXPR_DOUBLE:
-						[r setDouble:([r doubleValue]-[t doubleValue])];
+						[*r setDouble:([*r doubleValue]-[t3 doubleValue])];
 						break;
 					case EXPR_BOOL: // ?? && !
-						[r setBool:([r boolValue] && ![t boolValue])];
+						[*r setBool:([*r boolValue] && ![t3 boolValue])];
 						break;
 					case EXPR_STRING:
 					default: // ersätter sträng?
-						if([r doubleValue]==0.0 && [t doubleValue]==0.0)
-							[r setString: [t stringValue]];
+						if([*r doubleValue]==0.0 && [t3 doubleValue]==0.0)
+							[*r setString: [t3 stringValue]];
 						else
-							[r setDouble:([r doubleValue]-[t doubleValue])];
+							[*r setDouble:([*r doubleValue]-[t3 doubleValue])];
 						break;
 		 			}
 		 		}
 			}
 		}
-		[t release];
-    } @catch(NSException* e){
-        [t release];
+		[t3 release];
+   /* } @catch(NSException* e){
         @throw;
     } @finally {
         [t release];
@@ -723,7 +727,7 @@ void LXFormsExpr::ParseOperand()
             reason:@""
             userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
         @throw(e);
-    }
+    }*/
 //Logf(TRACE_LOG,"Level3 KLAR: r=%s",r->getString());
 
 }
@@ -736,13 +740,13 @@ void LXFormsExpr::ParseOperand()
 **                                                                       **
 *************************************************************************/
 
-- (void) Level4: (PPExpressionResult*) r {
-	PPExpressionResult* t = [[PPExpressionResult alloc] init];
-	@try{
+- (void) Level4: (PPExpressionResult**) r {
+	PPExpressionResult* t4 = [[PPExpressionResult alloc] init];
+	//@try{
 	char o;
 
         [self Level5: r];
-	while(((o = [_mToken characterAtIndex:0]) == '*') ||(o == '/') || (o == '%')){
+	while([_mToken length] && (((o = [_mToken characterAtIndex:0]) == '*') ||(o == '/') || (o == '%'))){
     
 		// if(isalpha(*expression)&&!isnumer(*expression))	/// för XML-uttryck
 		//	break;
@@ -752,25 +756,25 @@ void LXFormsExpr::ParseOperand()
         [self Level5: r];
 		if(_mSkip[_mLevel] == false){
 			if(o == '*'){
-				switch([r isType]){
+				switch([*r isType]){
 				case EXPR_DOUBLE:
-					[r setDouble:([r doubleValue]*[t doubleValue])];
+					[*r setDouble:([*r doubleValue]*[t4 doubleValue])];
 					break;
 				case EXPR_BOOL: // ?? && 
-					[r setBool:([r boolValue] && [t boolValue])];
+					[*r setBool:([*r boolValue] && [t4 boolValue])];
 					break;
 				case EXPR_STRING:
 				default: 
-					if([r doubleValue]==0.0 && [t doubleValue]==0.0)
-						[r appendString:([t stringValue])];
+					if([*r doubleValue]==0.0 && [t4 doubleValue]==0.0)
+						[*r appendString:([t4 stringValue])];
 					else
-						[r setDouble:([r doubleValue]*[t doubleValue])];
+						[*r setDouble:([*r doubleValue]*[t4 doubleValue])];
 					break;
 		 		}
 			}
 			else if(o == '/'){
-				if( [t doubleValue] == 0 ){
-                    [t release];
+				if( [t4 doubleValue] == 0 ){
+                    [t4 release];
                     NSException *e = [NSException
                                       exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_DIVZERO]]
                                       reason:@""
@@ -778,25 +782,25 @@ void LXFormsExpr::ParseOperand()
                     @throw(e);
                 }
 
-				switch([r isType]){
+				switch([*r isType]){
 				case EXPR_DOUBLE:
-					[r setDouble:([r doubleValue]/[t doubleValue])];
+					[*r setDouble:([*r doubleValue]/[t4 doubleValue])];
 					break;
 				case EXPR_BOOL: // ?? || 
-					[r setBool:([r boolValue] || [t boolValue])];
+					[*r setBool:([*r boolValue] || [t4 boolValue])];
 					break;
 				case EXPR_STRING:
 				default: // ersätter???
-					if([r doubleValue]==0.0 && [t doubleValue]==0.0)
-						[r setString:([t stringValue])];
+					if([*r doubleValue]==0.0 && [t4 doubleValue]==0.0)
+						[*r setString:([t4 stringValue])];
 					else
-						[r setDouble:([r doubleValue]/[t doubleValue])];
+						[*r setDouble:([*r doubleValue]/[t4 doubleValue])];
 					break;
 		 		}
 			}
 			else if( o == '%' ){
-				if( [t doubleValue] == 0 ) {   
-                    [t release];
+				if( [t4 doubleValue] == 0 ) {   
+                    [t4 release];
                     NSException *e = [NSException
                                   exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_DIVZERO]]
                                   reason:@""
@@ -804,27 +808,26 @@ void LXFormsExpr::ParseOperand()
                     @throw(e);
                 }
 
-				switch([r isType]){
+				switch([*r isType]){
 				case EXPR_DOUBLE:
-					[r setDouble:((double)fmod([r doubleValue],[t doubleValue]))];
+					[*r setDouble:((double)fmod([*r doubleValue],[t4 doubleValue]))];
 					break;
 				case EXPR_BOOL: // ?? || 
-					[r setBool:([r boolValue] || [t boolValue])];
+					[*r setBool:([*r boolValue] || [t4 boolValue])];
 					break;
 				case EXPR_STRING:
 				default: // ersätter???
-					if([r doubleValue]==0.0 && [t doubleValue]==0.0)
-						[r setString:[t stringValue]];
+					if([*r doubleValue]==0.0 && [t4 doubleValue]==0.0)
+						[*r setString:[t4 stringValue]];
 					else
-						[r setDouble:((double)fmod([r doubleValue],[t doubleValue]))];
+						[*r setDouble:((double)fmod([*r doubleValue],[t4 doubleValue]))];
 					break;
 		 		}
 			}
 		}
 	}
-    [t release];
-    } @catch(NSException* e){
-        [t release];
+    [t4 release];
+   /* } @catch(NSException* e){
         @throw;
     } @finally {
         [t release];
@@ -833,7 +836,7 @@ void LXFormsExpr::ParseOperand()
                           reason:@""
                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
         @throw(e);
-    }
+    }*/
 }
 
 /*************************************************************************
@@ -844,7 +847,7 @@ void LXFormsExpr::ParseOperand()
 **                                                                       **
 *************************************************************************/
 
-- (void) Level5: (PPExpressionResult*) r {
+- (void) Level5: (PPExpressionResult**) r {
 //	int  i;
 //	int  n;
 //	const int	aCount = 4;
@@ -853,7 +856,7 @@ void LXFormsExpr::ParseOperand()
 //	bool modify = false;
 //	bool generic = false;
 
-	@try {
+	//@try {
 		//for(i=0;i < aCount;++i)a[i] = NULL; //TODO: Hantera detta annorlunda
 
 		if( [_mToken characterAtIndex:0] == '(' ){
@@ -890,17 +893,17 @@ void LXFormsExpr::ParseOperand()
             
 			if(([_mToken compare:@"true" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] ==  NSOrderedSame) && ([_mExpression characterAtIndex:0] != 0) && ([_mExpression characterAtIndex:0] != '(')){
 				if(_mSkip[_mLevel] == true){}
-				else [r setBool:YES];
+				else [*r setBool:YES];
                 [self Parse];
 			}
 			else if(([_mToken compare:@"false" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] ==  NSOrderedSame) && ([_mExpression characterAtIndex:0] != 0) && ([_mExpression characterAtIndex:0] != '(')){
 				if(_mSkip[_mLevel] == true){}
-				else [r setBool:NO];
+				else [*r setBool:NO];
                 [self Parse];
 			}
 			else if([_mToken compare:@"null" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] ==  NSOrderedSame){
 				if(_mSkip[_mLevel] == YES){}
-				else [r setDouble:0.0];
+				else [*r setDouble:0.0];
                 [self Parse];
 			}
 			else if(_mType == PPCT_NUM ){
@@ -908,13 +911,13 @@ void LXFormsExpr::ParseOperand()
 				else {
 					//int i;
                     [_mToken replaceOccurrencesOfString:@"," withString:@"." options:NSCaseInsensitiveSearch range:NSMakeRange(0,[_mToken length])];
-					[r setDouble:[_mToken doubleValue]];
+					[*r setDouble:[_mToken doubleValue]];
 				}
                 [self Parse];
 			}
 			else if(_mType == PPCT_STR){
 				if(_mSkip[_mLevel] == YES){}
-				else [r setString:_mToken];
+				else [*r setString:_mToken];
                 [self Parse];
 			}
 			else if(_mType == PPCT_VAR ){
@@ -925,13 +928,13 @@ void LXFormsExpr::ParseOperand()
 					//Logf(TRACE_LOG,"%s, Funcs.size:%d, ",token,Funcs.size());
 					if([_mToken compare:@"true" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] !=  NSOrderedSame){
 						if(_mSkip[_mLevel] == YES){}
-						else [r setBool:YES];
+						else [*r setBool:YES];
                         [self Parse];				
 						foundFunction=YES;
 					}
 					else if([_mToken compare:@"false" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] !=  NSOrderedSame){
 						if(_mSkip[_mLevel] == true){}
-						else [r setBool:NO];
+						else [*r setBool:NO];
                         [self Parse];
                         [self Parse];
                         [self Parse];					
@@ -1082,7 +1085,7 @@ void LXFormsExpr::ParseOperand()
 			}
 		}
 
-    } @catch(NSException* e){
+   /* } @catch(NSException* e){
 			//for(int y9=0;y9 < n;++y9)delete a[y9]; // Hitta pŒ nŒgot annat
 			@throw;
 
@@ -1093,7 +1096,7 @@ void LXFormsExpr::ParseOperand()
                           reason:@""
                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
         @throw(e);
-    }
+    }*/
 
 }
 
@@ -1111,7 +1114,7 @@ void LXFormsExpr::ParseOperand()
 
 - (NSInteger) evaluate: (NSString*) e toResult: (PPExpressionResult*) result skip: (BOOL) skip {
 
-	@try {
+//	@try {
 		NSInteger ret = 0;
         
         e = [e stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -1135,7 +1138,7 @@ void LXFormsExpr::ParseOperand()
 
 		[self Parse];
 
-        [self Level1:result];
+        [self Level1:&result];
         
         ret = [result errorCode];
         
@@ -1143,7 +1146,7 @@ void LXFormsExpr::ParseOperand()
            [result setErrorCode: ret];
         }        
 		return ret;
-	}
+/*	}
 	@catch(NSException* err){
         NSInteger ec = [[[err userInfo] valueForKey:@"errorCode"] intValue];
 		[result setErrorCode: ec];
@@ -1152,7 +1155,7 @@ void LXFormsExpr::ParseOperand()
 	@finally{
 		[result setErrorCode: E_UNHANDL];
 		return E_UNHANDL;
-	}
+	}*/
 }
 
 @end

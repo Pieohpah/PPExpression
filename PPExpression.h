@@ -134,11 +134,11 @@ static NSInteger WATCHDOGLIMIT = 1000;
 - (BOOL) isDelOper: (unichar) c;
 - (BOOL) isInteger: (unichar) c;
 
-- (void) Level1: (PPExpressionResult*) r;
-- (void) Level2: (PPExpressionResult*) r;
-- (void) Level3: (PPExpressionResult*) r;
-- (void) Level4: (PPExpressionResult*) r;
-- (void) Level5: (PPExpressionResult*) r;
+- (void) Level1: (PPExpressionResult**) r;
+- (void) Level2: (PPExpressionResult**) r;
+- (void) Level3: (PPExpressionResult**) r;
+- (void) Level4: (PPExpressionResult**) r;
+- (void) Level5: (PPExpressionResult**) r;
 @end
 
 /*
