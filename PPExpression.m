@@ -9,6 +9,25 @@
 @implementation PPExpressionResult
 
 
+- (NSString *)description {
+    NSString* type;
+    switch (_mType) {
+        case  EXPR_NONE:
+            type = [NSString stringWithString:@"Unknown type"];
+            break;
+        case EXPR_DOUBLE:
+            type = [NSString stringWithString:@"Float"];
+            break;
+        case EXPR_BOOL:
+            type = [NSString stringWithString:@"Boolean"];
+            break;
+        case EXPR_STRING:
+            type = [NSString stringWithString:@"String"];
+            break;
+    }
+    return [NSString stringWithFormat:@"[%@] %@ %f", type, _mString, _mDouble];
+}
+
 - (id) init {
     self = [super init];
     if(self) {
@@ -38,7 +57,7 @@
 	_mDouble= s.doubleValue;
 	_mString = [NSString stringWithString: s];
     _mBool = s.boolValue;
-	//mBool=((isdigit(s[0]) && atoi(s)!=0) || !strcmp(s,"true") || !strcmp(s,"yes") || !strcmp(s,"ja"))?true:false;
+	//_mBool=((isdigit(s[0]) && atoi(s)!=0) || !strcmp(s,"true") || !strcmp(s,"yes") || !strcmp(s,"ja"))?true:false;
 }
 
 - (double) doubleValue {
@@ -106,7 +125,9 @@
 
 @implementation PPExpression
 
-
+- (NSString *)description {
+    return [NSString stringWithFormat:@"[%@] -token [%@]", _mExpression, _mToken];
+}
 
 
 /*
@@ -347,12 +368,15 @@ void LXFormsExpr::ParseOperand()
     }
     unichar c = [*s characterAtIndex:0];
     if ([*s length]==1) {
-        [*s setString:@""];
+        *s = nil;
+        *s = [NSMutableString stringWithString:@""];
+        NSLog(@"[%C] poppas och [%@] ar kvar",c,*s);
         return c;
     }
     NSMutableString* tmp = [NSMutableString stringWithString:[*s substringWithRange:NSMakeRange(1, [*s length]-1)]];
     *s = nil;
     *s = tmp;
+    NSLog(@"[%C] poppas och [%@] ar kvar",c,*s);
     return c;
 }
 
@@ -371,21 +395,27 @@ void LXFormsExpr::ParseOperand()
 	
 	// skippa blankspace: blanka och tab-tecken
 	//while(iswhite(*expression))expression++;
+     _mExpression = (NSMutableString*)[_mExpression stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 	
 	// om första tecken efter space är delimiter 
 	//(c == '+' || c == '-' || c == '*' || c == '/' || c == '%'  || c == '^' || c == '(' || c == ')' || c == ',' || c == '=' || c=='<' || c=='>' || c=='!' || c=='&' || c=='|')	
 	//	!(((*expression) == '/') && (*(expression+1) == '*') && (*(expression+2) == '/'))
     
     // Nolla _mToken
-    [_mToken setString:@""];
+    //[_mToken setString:@""];
+    _mToken = nil;
+    _mToken = [NSMutableString stringWithString:@""];
 
 	const char* kw = (const char*)0;
-	if([_mExpression length] >=3 &&  (    [self isDelim:[_mExpression characterAtIndex:0]] && 
+/*	if([_mExpression length] >=3 &&  (    [self isDelim:[_mExpression characterAtIndex:0]] && 
 			(
              !(([_mExpression characterAtIndex:0]) == '/' && [self isAlpha:[_mExpression characterAtIndex:1]] && ![self isNumeric:[_mExpression characterAtIndex:1]]) &&
 				!((([_mExpression characterAtIndex:0]) == '/') && ([_mExpression characterAtIndex:1] == '*') && ([_mExpression characterAtIndex:2] == '/'))
 			)
 		)) {
+ */
+    if ([_mExpression length] &&  [self isDelim:[_mExpression characterAtIndex:0]] ) {
+ 
 		_mType = PPCT_DEL;
 		if(kw != (const char*)0){
             // lägger till kw till token men hoppar över all alpha i expression
@@ -408,7 +438,7 @@ void LXFormsExpr::ParseOperand()
         // Lägger till typ och alla siffror 
 		_mType = PPCT_NUM;
 		while([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]])
-            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; //TODO: Exception:Out of bounds troligen här NSRangeException
+            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; ///BANG
 	}
 	// om det är en sträng
 	else if([_mExpression length] &&  ([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"')){
@@ -480,6 +510,8 @@ void LXFormsExpr::ParseOperand()
 		*t = 0;
 		while(iswhite(*expression))expression++;
 	} */
+    
+    NSLog(@"Expr: %@ - Token: %@", _mExpression, _mToken);
 }
 
 
@@ -522,8 +554,9 @@ void LXFormsExpr::ParseOperand()
 				else 
                     if(o=='|')
                         [*r setBool:([*r boolValue] || [t1 boolValue])];
-			}	
+			}
 		}
+     NSLog(@"Level 1: r:%@ t:%@ - [%@]",*r,t1, self);    
         [t1 release];
     
 	/*} @catch(NSException* e){
@@ -647,6 +680,7 @@ void LXFormsExpr::ParseOperand()
 			}
 		}
 	}
+     NSLog(@"Level 2: r:%@ t:%@ - [%@]",*r, t2, self);    
 	[t2 release];
 	/*} @catch(NSException* e){
 		@throw;
@@ -717,6 +751,7 @@ void LXFormsExpr::ParseOperand()
 		 		}
 			}
 		}
+     NSLog(@"Level 3: r:%@ t:%@ - [%@]",*r, t3, self);    
 		[t3 release];
    /* } @catch(NSException* e){
         @throw;
@@ -753,7 +788,7 @@ void LXFormsExpr::ParseOperand()
 
 		[self Parse];
 
-        [self Level5: r];
+        [self Level5: &t4];
 		if(_mSkip[_mLevel] == false){
 			if(o == '*'){
 				switch([*r isType]){
@@ -826,6 +861,7 @@ void LXFormsExpr::ParseOperand()
 			}
 		}
 	}
+     NSLog(@"Level 4: r:%@ t:%@ - [%@]",*r ,t4, self);
     [t4 release];
    /* } @catch(NSException* e){
         @throw;
@@ -888,8 +924,6 @@ void LXFormsExpr::ParseOperand()
 			[self Parse];
 		}
 		else {
-            
-            
             
 			if(([_mToken compare:@"true" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] ==  NSOrderedSame) && ([_mExpression characterAtIndex:0] != 0) && ([_mExpression characterAtIndex:0] != '(')){
 				if(_mSkip[_mLevel] == true){}
@@ -1084,6 +1118,7 @@ void LXFormsExpr::ParseOperand()
 				}
 			}
 		}
+    NSLog(@"Level 5: r:%@ - [%@]",*r, self);
 
    /* } @catch(NSException* e){
 			//for(int y9=0;y9 < n;++y9)delete a[y9]; // Hitta på något annat
