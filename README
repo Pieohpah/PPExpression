@@ -1,0 +1,11 @@
+PPExpression
+
+
+String expression evaluator.
+
+Originally written by me in C++ in 2002. 
+
+Class for evaluating expressions like '1+2' or '2*(2+4)/3'.
+Right now just a working draft. I should support 'and', 'or', 'true' and 'false'. Originally supported function pointers to validators and xml-paths. That code's still in there in C++ but commented out.
+
+/Peter Herber
