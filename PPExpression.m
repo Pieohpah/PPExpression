@@ -24,6 +24,9 @@
         case EXPR_STRING:
             type = [NSString stringWithString:@"String"];
             break;
+        default:   
+            type = [NSString stringWithString:@"Unknown type"];
+            break;
     }
     return [NSString stringWithFormat:@"[%@] %@ %f", type, _mString, _mDouble];
 }
@@ -114,222 +117,12 @@
 //==============================================
 // class PPExpression
 
-/*************************************************************************
-**                                                                       **
-** Parse()   Internal use only                                           **
-**                                                                       **
-** This function is used to grab the next token from the expression that **
-** is being evaluated.                                                   **
-**                                                                       **
-*************************************************************************/
-
 @implementation PPExpression
 
 - (NSString *)description {
     return [NSString stringWithFormat:@"[%@] -token [%@]", _mExpression, _mToken];
 }
 
-
-/*
-static const char* localKeyword(const char* p)
-{
-	if(strncmp_nc(p,"or ",3) == 0)return "||";
-	else if(strncmp_nc(p,"and ",4) == 0)return "&&";
-	else if(strncmp_nc(p,"lt ",3) == 0)return "<";
-	else if(strncmp_nc(p,"lte ",4) == 0)return "<=";
-	else if(strncmp_nc(p,"gte ",4) == 0)return ">=";
-	else if(strncmp_nc(p,"gt ",3) == 0)return ">";
-	else if(strncmp_nc(p,"eq ",3) == 0)return "==";
-	else if(strncmp_nc(p,"neq ",4) == 0)return "!=";
-	else return (const char*)0;
-}
-*/
-// #define iscomp(c)   (c == '&' || c == '|')
-// #define isdeloper(c) (c == '=' || c=='<' || c=='>' || c=='!')
-
-/*
-#if UNARY_FIX
-
-#define TOKEN_RESET(abct) \
-	abct = (char*)token; \
-	memset(stringParam,0,sizeof(stringParam)); \
-	memset(token,0,sizeof(token)); \
-	type = 0;
-	if(mWatchDog++ > WATCHDOGLIMIT)ERR(E_WATCHDOG);
-	
-#define SKIP_SPACE	while(iswhite(*expression))expression++;
-
-void LXFormsExpr::ParseOperator()
-{
-	char* t;
-	TOKEN_RESET(t);
-
-	// skippa blankspace: blanka och tab-tecken
-	SKIP_SPACE;
-		
-	// om första tecken efter space är delimiter 
-	const char* kw = (const char*)0;
-	if(isdelim(*expression) || ((kw=localKeyword((const char*)expression)) != (const char*)0)){
-		type = DEL;
-		if(kw != (const char*)0){
-			while(isalpha(*expression))expression++;
-			strcpy(t,kw);
-			t = &t[strlen(t)];
-		}
-		else {
-			if(isdeloper(*expression) && *(expression+1)=='=')*t++ = *expression++;
-			if(iscomp(*expression) && iscomp(*(expression+1)) && (*expression)==(*(expression+1)))*t++ = *expression++;
-			*t++ = *expression++;
-		}
-	}
-	else {
-		*t++ = *expression++;
-		*t = '\0';
-		ERR(E_SYNTAX1);
-		SKIP_SPACE;
-	}
-}
-
-void LXFormsExpr::ParseLParen()
-{
-	char* t;
-	TOKEN_RESET(t);
-	
-	// skippa blankspace: blanka och tab-tecken
-	SKIP_SPACE;
-		
-	// om första tecken efter space är delimiter 
-	if(*expression == '('){
-		type = DEL;
-		++expression;
-		strcpy((char*)token,"(");
-	}
-	else {
-		*t++ = *expression++;
-		*t = '\0';
-		ERR(E_SYNTAX2);
-		SKIP_SPACE;
-	}
-}
-
-void LXFormsExpr::ParseRParen()
-{
-	char* t;
-	TOKEN_RESET(t);
-	
-	// skippa blankspace: blanka och tab-tecken
-	SKIP_SPACE;
-		
-	// om första tecken efter space är delimiter 
-	if(*expression == ')'){
-		type = DEL;
-		++expression;
-		strcpy((char*)token,")");
-	}
-	else {
-		*t++ = *expression++;
-		*t = '\0';
-		ERR(E_SYNTAX3);
-		SKIP_SPACE;
-	}
-}
-
-
-void LXFormsExpr::ParseOperand()
-{
-	char* t;
-	t = (char*)token;
-	memset(stringParam,0,sizeof(stringParam));
-	memset(token,0,sizeof(token));
-
-	type = 0;
-	
-
-	if(mWatchDog++ > WATCHDOGLIMIT)ERR(E_WATCHDOG);
-	
-	// skippa blankspace: blanka och tab-tecken
-	while(iswhite(*expression))expression++;
-	
-	// Unary?
-	bool unary = false;
-	if(*expression == '-'){
-		*t++ = *expression++;
-		while(iswhite(*expression))expression++;
-		unary = true;
-	}
-	else if(*expression == '+'){
-		*t++ = *expression++;
-		while(iswhite(*expression))expression++;
-		unary = true;
-	}
-	
-	// Nu kan vi ha 1) konstant  2) xml-path  3) funktion
-	if(isnumer(*expression)){
-		type = NUM;
-		while(isnumer(*expression))*t++ = *expression++;
-	}
-	// om det är en sträng
-	else if(*expression == '\'' || *expression == '\"'){
-		type = STR;
-		char del = *expression++;
-		while(*expression && *expression != del)*t++ = *expression++;
-		if(!*expression)ERR(E_NT_STR){}
-		*expression++;
-		if(unary == true){
-			// tillårt inte unary operator framför strängen
-			ERR(E_NT_STR){}
-		}
-	}
-	else {
-		// om det är en XML-path, fortsätt samla
-		if((*expression) == '/'){
-			type=STR;
-			int pos=0;
-			while(isalpha(*expression))*t++ = *expression++;
-			// nu ska vi byta ut XML-path mot datat som 
-			// vi hittar där.
-			if(xpathFunc!=(xpathCallback)0){
-				strcpy((char*)token,(*xpathFunc)(usrData,(char*)token));
-				t = (char*)&token[strlen((char*)token)];	
-			}
-			else {
-				token[0] = '\0';
-				t = (char*)token;
-			}
-				
-		}
-		// om det är en variabel, fortsätt samla
-		else if(isalpha(*expression)){
-			type = VAR;
-			while(isalpha(*expression))*t++ = *expression++;
-		}
-		// om det är ett funktionsanrop, fortsätt samla
-		else if(*expression=='('){
-			type=FUNK;
-			int pos=0;
-			memset(stringParam,0,sizeof(stringParam));
-			*expression++;
-			while(isalpha(*expression) || (*expression) == '.' || (*expression) == ','){
-				stringParam[pos++]=*expression;
-				*t++ = *expression++;	
-			}
-			token[0] = *expression++;
-			token[1] = '\0';
-		}
-		else if(*expression){
-			*t++ = *expression++;
-			*t = 0;
-			ERR(E_SYNTAX4);
-		}
-		*t = 0;
-		while(iswhite(*expression))expression++;
-	}
-}
-
-#endif
- 
- 
-*/
 
 - (BOOL) isWhite: (unichar) c {
     return (c == ' ' || c == '\t' || c == '\r' || c == '\n');
@@ -370,17 +163,25 @@ void LXFormsExpr::ParseOperand()
     if ([*s length]==1) {
         *s = nil;
         *s = [NSMutableString stringWithString:@""];
-        NSLog(@"[%C] poppas och [%@] ar kvar",c,*s);
+        NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
         return c;
     }
     NSMutableString* tmp = [NSMutableString stringWithString:[*s substringWithRange:NSMakeRange(1, [*s length]-1)]];
     *s = nil;
     *s = tmp;
-    NSLog(@"[%C] poppas och [%@] ar kvar",c,*s);
+    NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
     return c;
 }
 
-// Kollar upp token: dels whitespace, dels delimitor, number string
+/*************************************************************************
+ **                                                                       **
+ ** Parse()   Internal use only                                           **
+ **                                                                       **
+ ** This function is used to grab the next token from the expression that **
+ ** is being evaluated.                                                   **
+ **                                                                       **
+ *************************************************************************/
+
 - (void) Parse {
 
 	_mType = 0;
@@ -393,16 +194,12 @@ void LXFormsExpr::ParseOperand()
 		@throw(e);
     }
 	
-	// skippa blankspace: blanka och tab-tecken
-	//while(iswhite(*expression))expression++;
      _mExpression = (NSMutableString*)[_mExpression stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 	
 	// om fšrsta tecken efter space Šr delimiter 
 	//(c == '+' || c == '-' || c == '*' || c == '/' || c == '%'  || c == '^' || c == '(' || c == ')' || c == ',' || c == '=' || c=='<' || c=='>' || c=='!' || c=='&' || c=='|')	
 	//	!(((*expression) == '/') && (*(expression+1) == '*') && (*(expression+2) == '/'))
     
-    // Nolla _mToken
-    //[_mToken setString:@""];
     _mToken = nil;
     _mToken = [NSMutableString stringWithString:@""];
 
@@ -423,7 +220,7 @@ void LXFormsExpr::ParseOperand()
                 [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
             }
 		}
-		else { // lŠgger till till token
+		else { // adds to token
 			if([self isDelOper:[_mExpression characterAtIndex:0]] && ([_mExpression characterAtIndex:1]=='='))
                 [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
             
@@ -433,14 +230,14 @@ void LXFormsExpr::ParseOperand()
 			[_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]];
 		}
 	}
-	// om det bšrjar pŒ en siffra
+	// number
 	else if([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]]){
         // LŠgger till typ och alla siffror 
 		_mType = PPCT_NUM;
 		while([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]])
             [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; ///BANG
 	}
-	// om det Šr en strŠng
+	// string
 	else if([_mExpression length] &&  ([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"')){
 		// lŠgger till typ och strŠngfnutt och allt till nŠsta fnutt i token
         _mType = PPCT_STR;
@@ -597,7 +394,7 @@ void LXFormsExpr::ParseOperand()
         }
 		//char oper = token[0];
 		if([_mToken length] >=2 &&  (([_mToken characterAtIndex:1] != '\0') && ([_mToken characterAtIndex:1] == '='))){
-			// andra tecken är ett '='
+			// second char is a '='
 
 			[self Parse];
             
@@ -606,7 +403,6 @@ void LXFormsExpr::ParseOperand()
 			if(_mSkip[_mLevel] == false){
 				if(([*r isType] == EXPR_STRING) && ([t2 isType] == EXPR_STRING)){
                     NSComparisonResult sComp = [[*r stringValue] compare:[t2 stringValue]]; 
-					//int sComp= strcmp(r->getString(),(*t).getString());
 					switch(t_1)
 					{
 					case '<':
@@ -626,7 +422,6 @@ void LXFormsExpr::ParseOperand()
 				else {
 					switch(t_1){
 					case '<':
-						//r->setBoolean(r->getDouble() <= (*t).getDouble());
                         [*r setBool:( [*r doubleValue] <= [t2 doubleValue] )];    
 						break;
 					case '>':
@@ -644,17 +439,16 @@ void LXFormsExpr::ParseOperand()
 				}
 			}
 		}
-		else { // vanlig < || >
+		else { // ordinary < || >
 			if((t_1 == '<') || (t_1 == '>')){
-				//char oper = *token;
 
 				[self Parse];
 
 				[self Level3:&t2];
 
                 NSComparisonResult sComp = [[*r stringValue] compare:[t2 stringValue]];
-				if(_mSkip[_mLevel] == false){
-					switch([*r isType]){
+				if(_mSkip[_mLevel] == false) {
+					switch([*r isType]) {
 					case EXPR_DOUBLE:
 					case EXPR_BOOL:
 						if(t_1=='<')
@@ -668,6 +462,7 @@ void LXFormsExpr::ParseOperand()
                             [*r setBool:((sComp = NSOrderedAscending) ? YES:NO)];
 						if(t_1=='>')
                             [*r setBool:((sComp = NSOrderedDescending) ? YES:NO)];
+                        break;
 					}
 				}
 			}
@@ -763,7 +558,6 @@ void LXFormsExpr::ParseOperand()
             userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
         @throw(e);
     }*/
-//Logf(TRACE_LOG,"Level3 KLAR: r=%s",r->getString());
 
 }
 
@@ -783,7 +577,7 @@ void LXFormsExpr::ParseOperand()
         [self Level5: r];
 	while([_mToken length] && (((o = [_mToken characterAtIndex:0]) == '*') ||(o == '/') || (o == '%'))){
     
-		// if(isalpha(*expression)&&!isnumer(*expression))	/// för XML-uttryck
+		// if(isalpha(*expression)&&!isnumer(*expression))	/// for XML-uttryck
 		//	break;
 
 		[self Parse];
@@ -825,7 +619,7 @@ void LXFormsExpr::ParseOperand()
 					[*r setBool:([*r boolValue] || [t4 boolValue])];
 					break;
 				case EXPR_STRING:
-				default: // ersätter???
+				default: // subsitutes what???
 					if([*r doubleValue]==0.0 && [t4 doubleValue]==0.0)
 						[*r setString:([t4 stringValue])];
 					else
@@ -851,7 +645,7 @@ void LXFormsExpr::ParseOperand()
 					[*r setBool:([*r boolValue] || [t4 boolValue])];
 					break;
 				case EXPR_STRING:
-				default: // ersätter???
+				default: // substitutes what???
 					if([*r doubleValue]==0.0 && [t4 doubleValue]==0.0)
 						[*r setString:[t4 stringValue]];
 					else
@@ -888,12 +682,12 @@ void LXFormsExpr::ParseOperand()
 //	int  n;
 //	const int	aCount = 4;
 //	char	genericFuncName[256];
-	//expResultType* a[aCount]; //TODO: Hantera detta annorlunda
+	//expResultType* a[aCount]; //TODO: handle this differently
 //	bool modify = false;
 //	bool generic = false;
 
 	//@try {
-		//for(i=0;i < aCount;++i)a[i] = NULL; //TODO: Hantera detta annorlunda
+		//for(i=0;i < aCount;++i)a[i] = NULL; //TODO: handle this differently
 
 		if( [_mToken characterAtIndex:0] == '(' ){
 			++_mLevel;
@@ -958,8 +752,6 @@ void LXFormsExpr::ParseOperand()
 				bool foundFunction = false;
 				// function
 				if([_mExpression characterAtIndex:0] == '('){
-					//char* t;
-					//Logf(TRACE_LOG,"%s, Funcs.size:%d, ",token,Funcs.size());
 					if([_mToken compare:@"true" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] !=  NSOrderedSame){
 						if(_mSkip[_mLevel] == YES){}
 						else [*r setBool:YES];
