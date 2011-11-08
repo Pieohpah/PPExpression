@@ -6,6 +6,7 @@
 #import "PPExpression.h"
 
 
+#pragma mark - PPExpressionResult
 @implementation PPExpressionResult
 
 
@@ -117,6 +118,7 @@
 //==============================================
 // class PPExpression
 
+#pragma mark - PPExpression
 @implementation PPExpression
 
 - (NSString *)description {
@@ -163,19 +165,19 @@
     if ([*s length]==1) {
         *s = nil;
         *s = [NSMutableString stringWithString:@""];
-        NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
+        //NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
         return c;
     }
     NSMutableString* tmp = [NSMutableString stringWithString:[*s substringWithRange:NSMakeRange(1, [*s length]-1)]];
     *s = nil;
     *s = tmp;
-    NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
+    //NSLog(@"popFirstCharacter: [%C] is popped [%@] is left",c,*s);
     return c;
 }
 
 /*************************************************************************
  **                                                                       **
- ** Parse()   Internal use only                                           **
+ ** Parse   Internal use only                                             **
  **                                                                       **
  ** This function is used to grab the next token from the expression that **
  ** is being evaluated.                                                   **
@@ -191,6 +193,7 @@
                           exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_WATCHDOG]]
                           reason:@""
                           userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_WATCHDOG] forKey:@"errorCode"]];
+        NSLog(@"Throw: %@",e);
 		@throw(e);
     }
 	
@@ -232,23 +235,31 @@
 	}
 	// number
 	else if([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]]){
-        // Lägger till typ och alla siffror 
+        // Adds type and all digits to token
 		_mType = PPCT_NUM;
 		while([_mExpression length] && [self isNumeric:[_mExpression characterAtIndex:0]])
-            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; ///BANG
+            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; 
 	}
 	// string
 	else if([_mExpression length] &&  ([_mExpression characterAtIndex:0]=='\'' ||[_mExpression characterAtIndex:0]=='\"')){
-		// lägger till typ och strängfnutt och allt till nästa fnutt i token
+		// Adds type, quotation mark and all characters 'til next quotation mark to token
         _mType = PPCT_STR;
-		/*char del=*expression++;
-		while(*expression && *expression != del)*t++ = *expression++;
-		if(!*expression)ERR( E_NT_STR ){}
-		*expression++; */
-        //TODO: Gör rätt
+        unichar del = [self popFirstCharacter:&_mExpression];
+        while([_mExpression length] && [_mExpression characterAtIndex:0]!=del)
+            [_mToken appendFormat:@"%C",[self popFirstCharacter:&_mExpression]]; 
+        if ([_mExpression length]) {
+            [self popFirstCharacter:&_mExpression];
+        } else {
+            NSException *e = [NSException
+                              exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_NT_STR]]
+                              reason:@""
+                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_NT_STR] forKey:@"errorCode"]];
+            NSLog(@"Throw: %@",e);
+            @throw(e);
+        }
 	}
 	/* else {
-		// om det ‰r en XML-path, fortsätt samla
+		// if it's an XML-path, continue gathering
 		if((*expression) == '/'){
 			type=STR;
 			int pos=0;
@@ -269,8 +280,7 @@
 			*t = '\0';
 //Logf(TRACE_LOG,"token[%s]",token);
 			//while(isalpha(*expression))*t++ = *expression++;
-			// nu ska vi byta ut XML-path mot datat som 
-			// vi hittar d‰r.
+			// now we switch the XML-path for the data there
 			if(xpathFunc!=(xpathCallback)0){
 				strcpy((char*)token,(*xpathFunc)(usrData,(char*)token));
 				t = (char*)&token[strlen((char*)token)];	
@@ -281,12 +291,12 @@
 			}
 				
 		}
-		// om det ‰r en variabel, fortsätt samla
+		// if it's a variable keep on gathering
 		else if(isalpha(*expression)){
 			type = VAR;
 			while(isalpha(*expression) || (*expression) == '.')*t++ = *expression++;
 		}
-		// om det ‰r ett funktionsanrop, fortsätt samla
+		// if it's a function call keep on gathering
 		else if(*expression=='('){
 			type=FUNK;
 			int pos=0;
@@ -314,7 +324,7 @@
 
 /*************************************************************************
 **                                                                       **
-** Level1( TYPE* r )   Internal use only                                 **
+** Level1: (PPExpressionResult**) r   Internal use only                  **
 **                                                                       **
 ** This function handles any variable assignment operations.             **
 ** It returns a value of 1 if it is a top-level assignment operation,    **
@@ -357,23 +367,24 @@
         [t1 release];
     
 	/*} @catch(NSException* e){
-		[t release];
+		[t1 release];
 		@throw;
 	} @finally {
-		[t release];
+		[t1 release];
         NSException *e = [NSException
                           exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_UNHANDL]]
                           reason:@""
-                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
-		@throw(e);
+                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level1:%d",E_UNHANDL] forKey:@"errorCode"]];
+        NSLog(@"%@",e);
+        @throw(e);
 	}*/
 }
 
 /*************************************************************************
 **                                                                       **
-** Level2( TYPE* r )   Internal use only                                 **
+** Level2: (PPExpressionResult**) r   Internal use only                  **
 **																		 **
-** This function handles < > <= => != ==
+** This function handles < > <= => != ==                                 **
 **                                                                       **
 *************************************************************************/
 
@@ -389,7 +400,7 @@
             NSException *e = [NSException
                               exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_WATCHDOG]]
                               reason:@""
-                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_WATCHDOG] forKey:@"errorCode"]];
+                              userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level2:%d",E_WATCHDOG] forKey:@"errorCode"]];
             @throw(e);
         }
 		//char oper = token[0];
@@ -480,18 +491,19 @@
 	/*} @catch(NSException* e){
 		@throw;
 	} @finally {
-		[t release];
+		[t2 release];
         NSException *e = [NSException
                           exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_UNHANDL]]
                           reason:@""
-                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
-		@throw(e);
+                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level2:%d",E_UNHANDL] forKey:@"errorCode"]];
+        NSLog(@"%@",e);
+        @throw(e);
 	}*/
 }
 
 /*************************************************************************
 **                                                                       **
-** Level3( TYPE* r )   Internal use only                                 **
+** Level3: (PPExpressionResult**) r  Internal use only                   **
 **                                                                       **
 ** This function handles any addition and subtraction operations.        **
 **                                                                       **
@@ -551,11 +563,12 @@
    /* } @catch(NSException* e){
         @throw;
     } @finally {
-        [t release];
+        [t3 release];
         NSException *e = [NSException
             exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_UNHANDL]]
             reason:@""
-            userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
+            userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level3:%d",E_UNHANDL] forKey:@"errorCode"]];
+        NSLog(@"%@",e);
         @throw(e);
     }*/
 
@@ -563,7 +576,7 @@
 
 /*************************************************************************
 **                                                                       **
-** Level4( TYPE* r )   Internal use only                                 **
+** Level4: (PPExpressionResult**) r    Internal use only                 **
 **                                                                       **
 ** This function handles any multiplication, division, or modulo.        **
 **                                                                       **
@@ -660,18 +673,19 @@
    /* } @catch(NSException* e){
         @throw;
     } @finally {
-        [t release];
+        [t4 release];
         NSException *e = [NSException
                           exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_UNHANDL]]
                           reason:@""
-                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
+                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level4%d",E_UNHANDL] forKey:@"errorCode"]];
+        NSLog(@"%@",e);
         @throw(e);
     }*/
 }
 
 /*************************************************************************
 **                                                                       **
-** Level5( TYPE* r )   Internal use only                                 **
+** Level5:(PPExpressionResult**)r   Internal use only                    **
 **                                                                       **
 ** This function handles any literal numbers, variables, or functions.   **
 **                                                                       **
@@ -778,25 +792,25 @@
 						if((!strcmp_nc((const char*)token, Funcs[i].name)) || modify || generic){
 							n = 0;
 							do {
-								*expression++; // vi hoppar fˆrbi fˆrsta parentesen (efter funk-namnet)
+								*expression++; // skip first paranthesis after function call
 								memset(token,0,sizeof(token));
 								t=(char*)token;
 								int stackP = 0;
 								for(;;){
-									if(expression[0] == '\0')break;	// slut pÂ indatastr‰ng
+									if(expression[0] == '\0')break;	// end of input string
 									else if((expression[0] == '\\') && (expression[1] != '\0')){
 										*expression++;
 										*t++ = *expression++;
 									}
 									else if(expression[0] == ','){
-										if(stackP == 0)break;	// omatchad slutparentes stoppar
+										if(stackP == 0)break;	// unmatched end paranthesis - end
 										else {
 											stackP--;
 											*t++ = *expression++;
 										}
 									}
 									else if(expression[0] == ')'){
-										if(stackP == 0)break;	// omatchad slutparentes stoppar
+										if(stackP == 0)break;	// unmatched end paranthesis - ends
 										else {
 											stackP--;
 											*t++ = *expression++;
@@ -821,7 +835,7 @@
 								}
 								if((hasExpr == false) && (*expression == ')'))break;
 								//------------------------------------
-								// utv‰rdera token som nytt uttryck
+								// evaluate token as new expression
 								a[n] = new expResultType();
 								LXFormsExpr FETmp;
 								FETmp.SetCallbackFunc(xpathFunc,usrData);
@@ -839,7 +853,7 @@
 							}while((n < aCount) && *expression && (*expression == ','));
 
 
-							// om funken behˆver XMLdata
+							// if the function needs XMLdata
 							//if(g_xpathFunc==0 && g_xpathFunc!=xpathFunc)g_xpathFunc=xpathFunc;
 							//if(g_usrData==0 && g_usrData!=usrData)g_usrData=usrData;
 
@@ -912,7 +926,7 @@
 		}
     NSLog(@"Level 5: r:%@ - [%@]",*r, self);
 
-   /* } @catch(NSException* e){
+   /*} @catch(NSException* e){
 			//for(int y9=0;y9 < n;++y9)delete a[y9]; // Hitta på något annat
 			@throw;
 
@@ -921,27 +935,28 @@
         NSException *e = [NSException
                           exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_UNHANDL]]
                           reason:@""
-                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"%d",E_UNHANDL] forKey:@"errorCode"]];
+                          userInfo:[NSDictionary dictionaryWithObject:[NSString stringWithFormat:@"Level5:%d",E_UNHANDL] forKey:@"errorCode"]];
+        NSLog(@"%@",e);
         @throw(e);
     }*/
 
 }
 
-/*************************************************************************
-**                                                                       **
-** Evaluate( char* e, TYPE* result, int* a )                             **
-**                                                                       **
-** This function is called to evaluate the expression E and return the   **
-** answer in RESULT.  If the expression was a top-level assignment, a    **
-** value of 1 will be returned in A, otherwise it will contain 0.        **
-**                                                                       **
-** Returns E_OK if the expression is valid, or an error code.            **
-**                                                                       **
-*************************************************************************/
+/*********************************************************************************
+**                                                                              **
+** evaluate:(NSString*)e toResult:(PPExpressionResult*)result skip:(BOOL) skip  **
+**                                                                              **
+** This function is called to evaluate the expression E and return the          **
+** answer in RESULT.  If the expression was a top-level assignment, a           **
+** value of 1 will be returned in A, otherwise it will contain 0.               **
+**                                                                              **
+** Returns E_OK if the expression is valid, or an error code.                   **
+**                                                                              **
+*********************************************************************************/
 
 - (NSInteger) evaluate: (NSString*) e toResult: (PPExpressionResult*) result skip: (BOOL) skip {
 
-//	@try {
+	@try {
 		NSInteger ret = 0;
         
         e = [e stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -973,7 +988,7 @@
            [result setErrorCode: ret];
         }        
 		return ret;
-/*	}
+	}
 	@catch(NSException* err){
         NSInteger ec = [[[err userInfo] valueForKey:@"errorCode"] intValue];
 		[result setErrorCode: ec];
@@ -982,7 +997,7 @@
 	@finally{
 		[result setErrorCode: E_UNHANDL];
 		return E_UNHANDL;
-	}*/
+	}
 }
 
 @end
