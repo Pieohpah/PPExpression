@@ -617,6 +617,7 @@
 			else if(o == '/'){
 				if( [t4 doubleValue] == 0 ){
                     [t4 release];
+                    NSLog(@"Throws divide by zero exception");
                     NSException *e = [NSException
                                       exceptionWithName:[NSString stringWithFormat:@"%s",ErrMsg[E_DIVZERO]]
                                       reason:@""
@@ -763,14 +764,14 @@
                 [self Parse];
 			}
 			else if(_mType == PPCT_VAR ){
-				bool foundFunction = false;
+				//bool foundFunction = false;
 				// function
 				if([_mExpression characterAtIndex:0] == '('){
 					if([_mToken compare:@"true" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] !=  NSOrderedSame){
 						if(_mSkip[_mLevel] == YES){}
 						else [*r setBool:YES];
                         [self Parse];				
-						foundFunction=YES;
+						//foundFunction=YES;
 					}
 					else if([_mToken compare:@"false" options:NSCaseInsensitiveSearch range:NSMakeRange(0, [_mToken length])] !=  NSOrderedSame){
 						if(_mSkip[_mLevel] == true){}
@@ -778,7 +779,7 @@
                         [self Parse];
                         [self Parse];
                         [self Parse];					
-						foundFunction=YES;
+						//foundFunction=YES;
 					}
 					/*else {
 					    for( i=0; i<Funcs.size() && !foundFunction; i++ ){
@@ -990,14 +991,15 @@
 		return ret;
 	}
 	@catch(NSException* err){
+        NSLog(@"Catch: %@",[[err userInfo] valueForKey:@"errorCode"]);
         NSInteger ec = [[[err userInfo] valueForKey:@"errorCode"] intValue];
 		[result setErrorCode: ec];
 		return ec;
 	}
-	@finally{
+/*	@finally{
 		[result setErrorCode: E_UNHANDL];
 		return E_UNHANDL;
-	}
+	}*/
 }
 
 @end
